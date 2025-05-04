@@ -2,3 +2,8 @@ anthropic
 mcp
 openai
 python-dotenv
+langchain
+langgraph
+langchain-anthropic
+langchain-openai
+langchain-mcp-adapters

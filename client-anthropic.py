@@ -1,14 +1,21 @@
 import asyncio
 from typing import Optional
 from contextlib import AsyncExitStack
-
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-
 from anthropic import Anthropic
 from dotenv import load_dotenv
+import sys
 
 load_dotenv()  # load environment variables from .env
+
+def get_size(obj):
+    size = sys.getsizeof(obj)
+    if isinstance(obj, dict):
+        size += sum(get_size(k) + get_size(v) for k, v in obj.items())
+    elif isinstance(obj, (list, tuple, set)):
+        size += sum(get_size(item) for item in obj)
+    return size
 
 class MCPClient:
     def __init__(self):
@@ -49,6 +56,9 @@ class MCPClient:
 
     async def process_query(self, query: str) -> str:
         """Process a query using Claude and available tools"""
+
+        print(f"* User: {query}")
+
         messages = self.messages
         messages.append({
             "role": "user",
@@ -65,39 +75,43 @@ class MCPClient:
         # Add a helper function to process recursive tool calls
         return await self._process_with_tool_calls(messages, available_tools)
 
-    async def _process_with_tool_calls(self, messages, available_tools, max_iterations=10):
+    async def _process_with_tool_calls(self, messages, available_tools, iteration=0, max_iterations=10):
         """Process messages with multiple rounds of tool calls"""
-        iteration = 0
         final_text = []
         
-        # print("Request messages:")
-        # print(messages)
+        print(f"\nRequest: iteration {iteration}")
+
+        pruned_messages = self._get_messages_for_llm()
+        print(f"Size of messages: {get_size(messages)}, size of pruned messages: {get_size(pruned_messages)}")
 
         # Call Claude with current conversation history
         response = self.anthropic.messages.create(
             model="claude-3-5-sonnet-20241022",
-            max_tokens=1000,
-            messages=messages,
+            max_tokens=4000,
+            messages=pruned_messages,
             tools=available_tools
         )
         # print("Response messages:")
         # print(response)
 
-        # messages.append({
-        #     "role": "assistant",
-        #     "content": response.content
-        # })
-
-        # go through the response and add to history
+        has_tool_call = False
         for content in response.content:
             if content.type == 'text':
+                # add to memory
                 messages.append({
                     "role": "assistant",
                     "content": content.text
                 })
+
+                print(f"* Assistant: {content.text}")
+                # final_text.append(content.text)
+
             elif content.type == 'tool_use':
+                has_tool_call = True
                 tool_name = content.name
                 tool_args = content.input
+
+                # add to memory
                 messages.append({
                     "role": "assistant",
                     "content": [
@@ -110,28 +124,13 @@ class MCPClient:
                     ]
                 })
 
-        has_tool_call = False
-        for content in response.content:
-            if content.type == 'text':
-                print(f"Text: {content.text}")
-                # final_text.append(content.text)
-
-            elif content.type == 'tool_use':
-                has_tool_call = True
-                tool_name = content.name
-                tool_args = content.input
+                print(f"* Tool use: {tool_name} with args {tool_args}")
 
                 # Execute tool call
-                print(f"[Calling tool {tool_name} with args {tool_args}]")
+                # print(f"[Calling tool {tool_name} with args {tool_args}]")
                 tool_result = await self.session.call_tool(tool_name, tool_args)
 
-                print("Tool result:")
-                print(tool_result)
-
-                if "Timeout" in tool_result.content[0].text:
-                    print("Tool execution timed out, waiting 10 seconds before continuing...")
-                    await asyncio.sleep(10)
-                    print("Resuming after timeout...")
+                print(f"* Tool result: {tool_result}")
 
                 result_blocks = []
                 for block in tool_result.content:
@@ -156,9 +155,38 @@ class MCPClient:
                 })
 
         if has_tool_call:
-            await self._process_with_tool_calls(messages, available_tools)
+            await self._process_with_tool_calls(messages, available_tools, iteration + 1, max_iterations)
         
         return "\n".join(final_text)
+
+    def _get_messages_for_llm(self):
+
+        # last three messages
+        # messages = self.messages[-3:] if len(self.messages) >= 3 else self.messages
+
+        messages = []
+        last_tool_included = False
+        for message in reversed(self.messages):
+            # print(f"role: {message['role']}, size: {get_size(message['content'])}")
+            if (message['role'] == 'assistant' and 
+                isinstance(message['content'], list) and 
+                len(message['content']) > 0 and 
+                message['content'][0]['type'] == 'tool_use'): 
+                if last_tool_included:
+                   continue 
+                else:
+                    last_tool_included = True
+
+            if (message['role'] == 'user' and
+                isinstance(message['content'], list) and 
+                len(message['content']) > 0 and 
+                message['content'][0].get('type') == 'tool_result' and 
+                last_tool_included):
+                continue
+
+            messages.insert(0, message)
+
+        return messages
 
     async def chat_loop(self):
         """Run an interactive chat loop"""
@@ -166,17 +194,13 @@ class MCPClient:
         print("Type your queries or 'quit' to exit.")
         
         while True:
-            try:
-                query = input("\nQuery: ").strip()
+            query = input("\nQuery: ").strip()
+            
+            if query.lower() == 'quit':
+                break
                 
-                if query.lower() == 'quit':
-                    break
-                    
-                response = await self.process_query(query)
-                print("\n" + response)
-                    
-            except Exception as e:
-                print(f"\nError: {str(e)}")
+            response = await self.process_query(query)
+            # print("\n" + response)
     
     async def cleanup(self):
         """Clean up resources"""
@@ -189,9 +213,11 @@ async def main():
         
     client = MCPClient()
     try:
+        # interactive chat
         await client.connect_to_server(sys.argv[1])
         await client.chat_loop()
 
+        # non-interactive query
         # response = await client.process_query("navigate to localhost:8080 and login with username 'admin' and password 'admin'")
         # print("Final response:")
         # print(response)
