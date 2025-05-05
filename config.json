@@ -1,0 +1,16 @@
+{
+  "browser": {
+    "browserName": "chromium",
+    "userDataDir": "./user_data",
+    "launchOptions": {
+      "headless": false,
+      "executablePath": "/Users/martin.kuba/Library/Caches/ms-playwright/chromium-1161/chrome-mac/Chromium.app/Contents/MacOS/Chromium"
+    },
+
+    "contextOptions": {
+      "viewport": { "width": 1280, "height": 720}
+    }
+  },
+  "vision": false,
+  "outputDir": "./out"
+}
