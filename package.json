@@ -9,7 +9,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@playwright/mcp": "^0.0.10",
-    "playwright": "^1.51.1"
+    "@playwright/mcp": "^0.0.10"
   }
 }

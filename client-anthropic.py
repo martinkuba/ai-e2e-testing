@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional
+from typing import Optional, List
 from contextlib import AsyncExitStack
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -7,7 +7,7 @@ from anthropic import Anthropic
 from dotenv import load_dotenv
 import sys
 
-load_dotenv()  # load environment variables from .env
+load_dotenv()
 
 def get_size(obj):
     size = sys.getsizeof(obj)
@@ -25,11 +25,12 @@ class MCPClient:
         self.anthropic = Anthropic()
         self.messages = []
 
-    async def connect_to_server(self, server_script_path: str):
+    async def connect_to_server(self, server_script_path: str, server_args: List[str] = None):
         """Connect to an MCP server
         
         Args:
             server_script_path: Path to the server script (.py or .js)
+            server_args: Additional arguments to pass to the server script
         """
         is_python = server_script_path.endswith('.py')
         is_js = server_script_path.endswith('.js')
@@ -37,9 +38,13 @@ class MCPClient:
             raise ValueError("Server script must be a .py or .js file")
             
         command = "python" if is_python else "node"
+        args = [server_script_path]
+        if server_args:
+            args.extend(server_args)
+            
         server_params = StdioServerParameters(
             command=command,
-            args=[server_script_path],
+            args=args,
             env=None
         )
 
@@ -57,7 +62,7 @@ class MCPClient:
     async def process_query(self, query: str) -> str:
         """Process a query using Claude and available tools"""
 
-        print(f"* User: {query}")
+        # print(f"* User: {query}")
 
         messages = self.messages
         messages.append({
@@ -81,8 +86,9 @@ class MCPClient:
         
         print(f"\nRequest: iteration {iteration}")
 
+        # prune messages to get around rate limit (40000 tokens per minute) in Anthropic
         pruned_messages = self._get_messages_for_llm()
-        print(f"Size of messages: {get_size(messages)}, size of pruned messages: {get_size(pruned_messages)}")
+        # print(f"Size of messages: {get_size(messages)}, size of pruned messages: {get_size(pruned_messages)}")
 
         # Call Claude with current conversation history
         response = self.anthropic.messages.create(
@@ -91,7 +97,7 @@ class MCPClient:
             messages=pruned_messages,
             tools=available_tools
         )
-        # print("Response messages:")
+        print(f"Response: {len(response.content)} blocks")
         # print(response)
 
         has_tool_call = False
@@ -130,7 +136,7 @@ class MCPClient:
                 # print(f"[Calling tool {tool_name} with args {tool_args}]")
                 tool_result = await self.session.call_tool(tool_name, tool_args)
 
-                print(f"* Tool result: {tool_result}")
+                # print(f"* Tool result: {tool_result}")
 
                 result_blocks = []
                 for block in tool_result.content:
@@ -160,14 +166,15 @@ class MCPClient:
         return "\n".join(final_text)
 
     def _get_messages_for_llm(self):
-
+        """Remove old messages to get around rate limit (40000 tokens per minute) in Anthropic
+        The current strategy is to remove all tool calls and their results, and only keep the last one.
+        """
         # last three messages
         # messages = self.messages[-3:] if len(self.messages) >= 3 else self.messages
 
         messages = []
         last_tool_included = False
         for message in reversed(self.messages):
-            # print(f"role: {message['role']}, size: {get_size(message['content'])}")
             if (message['role'] == 'assistant' and 
                 isinstance(message['content'], list) and 
                 len(message['content']) > 0 and 
@@ -208,13 +215,17 @@ class MCPClient:
 
 async def main():
     if len(sys.argv) < 2:
-        print("Usage: python client.py <path_to_server_script>")
+        print("Usage: python client.py <path_to_server_script> [server_args...]")
         sys.exit(1)
         
     client = MCPClient()
     try:
+        # Get server script path and any additional arguments
+        server_script = sys.argv[1]
+        server_args = sys.argv[2:] if len(sys.argv) > 2 else None
+        
         # interactive chat
-        await client.connect_to_server(sys.argv[1])
+        await client.connect_to_server(server_script, server_args)
         await client.chat_loop()
 
         # non-interactive query
