@@ -110,7 +110,7 @@ class MCPClient:
 
         # Call Claude with current conversation history
         response = self.anthropic.messages.create(
-            model="claude-3-7-sonnet-latest",
+            model="claude-3-5-sonnet-latest",
             max_tokens=4000,
             messages=pruned_messages,
             tools=available_tools,
