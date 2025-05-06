@@ -67,9 +67,11 @@ Only attempt one retry. If it still fails, report the issue and continue or abor
 async def main():
     client = MCPClient()
 
-    # path = os.path.abspath("node_modules/@playwright/mcp/cli.js")
-    # await client.connect_to_server(path)
-    await client.connect_to_server("/Users/martin.kuba/dev/playwright-mcp/cli.js", ["--config", "./config.json"])
+    path = os.path.abspath("node_modules/@playwright/mcp/cli.js")
+    await client.connect_to_server(path)
+
+    # passing config file currently works only with playwright-mcp main branch (needs to be built locally) 
+    # await client.connect_to_server("/Users/martin.kuba/dev/playwright-mcp/cli.js", ["--config", "./config.json"])
 
     for instruction in instructions:
         # print(f"Press enter to run next step:\n{instruction}")
