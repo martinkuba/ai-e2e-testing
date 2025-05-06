@@ -25,19 +25,17 @@ npm install
 Create `.env` file in the working directory, and add environmnent variables depending on the service you use.
 
 ```
-OPENAI_API_KEY=...
 ANTHROPIC_API_KEY=...
 ```
 
 ## Run
 
-Run with Anthropic
+Run with interactive chat interface
 ```shell
 python client-anthropic.py node_modules/@playwright/mcp/cli.js
 ```
 
-You can also pass parameters to Playwright
+Run predefined test cases (list of prompts)
 ```shell
-python client-anthropic.py ~/dev/playwright-mcp/cli.js --config ./config.json
+python client-anthropic.py test-instructions.py
 ```
-
