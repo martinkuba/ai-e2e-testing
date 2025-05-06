@@ -75,7 +75,7 @@ class MCPClient:
         # print("\nConnected to server with tools:", [tool.name for tool in tools])
         # log_debug("MCP Client Started!")
 
-    async def process_query(self, query: str) -> str:
+    async def process_query(self, query: str, system_prompt: str = None) -> str:
         """Process a query using Claude and available tools"""
 
         log_message(f"* User: {query}", Fore.LIGHTBLUE_EX)
@@ -94,9 +94,9 @@ class MCPClient:
         } for tool in response.tools]
 
         # Add a helper function to process recursive tool calls
-        return await self._process_with_tool_calls(messages, available_tools)
+        return await self._process_with_tool_calls(messages, available_tools, system_prompt=system_prompt)
 
-    async def _process_with_tool_calls(self, messages, available_tools, iteration=0, max_iterations=10):
+    async def _process_with_tool_calls(self, messages, available_tools, iteration=0, max_iterations=10, system_prompt: str = None):
         """Process messages with multiple rounds of tool calls"""
         final_text = []
         
@@ -106,12 +106,16 @@ class MCPClient:
         pruned_messages = self._get_messages_for_llm()
         # print(f"Size of messages: {get_size(messages)}, size of pruned messages: {get_size(pruned_messages)}")
 
+        system_prompt = "" if not system_prompt else system_prompt
+
         # Call Claude with current conversation history
         response = self.anthropic.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-3-7-sonnet-latest",
             max_tokens=4000,
             messages=pruned_messages,
-            tools=available_tools
+            tools=available_tools,
+            temperature=0.4,
+            system=system_prompt
         )
         log_debug(f"Response: {len(response.content)} blocks")
         # print(response)
@@ -152,7 +156,7 @@ class MCPClient:
                 # print(f"[Calling tool {tool_name} with args {tool_args}]")
                 tool_result = await self.session.call_tool(tool_name, tool_args)
 
-                # print(f"* Tool result: {tool_result}")
+                log_debug(f"* Tool result: {tool_result}")
 
                 result_blocks = []
                 for block in tool_result.content:
