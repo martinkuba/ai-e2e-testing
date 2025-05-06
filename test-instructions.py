@@ -8,23 +8,23 @@ import os
 # ]
 
 # Test: Navigation to Synthetic Monitoring
-instructions = [
-  "navigate to: http://localhost:8080/now/sow/home. if you are presented with login screen, use admin/admin to login",
-  "Click the Synthetics Management button",
-  "Confirm that the page title is: Synthetic monitoring | Service Operations Workspace | ServiceNow",
-  "Ensure that the page heading 'Synthetic monitoring' is visible."
-]
-
-# Test: Home Page Buttons and Filter Dialog
 # instructions = [
 #   "navigate to: http://localhost:8080/now/sow/home. if you are presented with login screen, use admin/admin to login",
-#   "Go to: http://localhost:8080/now/sow/synthetics-management.",
-#   "Wait for the page to fully load.",
-#   "Check that the following buttons are visible: Filter, Refresh, Edit columns, Delete, Edit (exact match), Export, New",
-#   "Click the Filter button.",
-#   "Confirm that a dialog opens.",
-#   "Close the dialog by clicking Close dialog."
+#   "Click the Synthetics Management button",
+#   "Confirm that the page title is: Synthetic monitoring | Service Operations Workspace | ServiceNow",
+#   "Ensure that the page heading 'Synthetic monitoring' is visible."
 # ]
+
+# Test: Home Page Buttons and Filter Dialog
+instructions = [
+  "navigate to: http://localhost:8080/now/sow/home. if you are presented with login screen, use admin/admin to login",
+  "Go to: http://localhost:8080/now/sow/synthetics-management.",
+  "Wait for the page to fully load.",
+  "Check that the following buttons are visible: Filter, Refresh, Edit columns, Delete, Edit (exact match), Export, New",
+  "Click the Filter button.",
+  "Confirm that a dialog opens.",
+  "Close the dialog by clicking Close dialog."
+]
 
 # instructions = ["""
 #   - Navigate to: http://localhost:8080/now/sow/home. if you are presented with login screen, use admin/admin to login.
@@ -74,7 +74,7 @@ async def main():
     # await client.connect_to_server("/Users/martin.kuba/dev/playwright-mcp/cli.js", ["--config", "./config.json"])
 
     for instruction in instructions:
-        # print(f"Press enter to run next step:\n{instruction}")
+        # print(f"Press enter to run next step:\n Next step: {instruction}")
         # input()
         await client.process_query(instruction, system_prompt)
     
